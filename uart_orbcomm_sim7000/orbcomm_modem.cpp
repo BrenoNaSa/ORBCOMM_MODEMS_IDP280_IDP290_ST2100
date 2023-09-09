@@ -15,8 +15,8 @@ OrbcommModem::OrbcommModem(void) // Implementação do construtor da classe
   serialInitialize(BAUDRATE, SERIAL_REGISTER, PIN_SERIAL_RX, PIN_SERIAL_TX);
 
   bool isolated_serial_orbcommserial = disableSim7000Serial(PWRKEY, OUTPUT, HIGH);
-  PortSerial.printf("ORBCOMM serial isolado BOOL: %s\n", BOOL_PRINTF(isolated_serial_orbcommserial));
-  PortSerial.printf("ORBCOMM serial isolado INTEGER: %d\n", int(isolated_serial_orbcommserial));
+  Serial.printf("ORBCOMM serial isolado BOOL: %s\n", BOOL_PRINTF(isolated_serial_orbcommserial));
+  Serial.printf("ORBCOMM serial isolado INTEGER: %d\n", int(isolated_serial_orbcommserial));
 
   isConnectionAvailable(); // Essa função verifica se a conexão está disponível chamando a função do comando AT.
 }
@@ -56,9 +56,10 @@ double OrbcommModem::getTimeStamp(void)
   return timestamp;
 }
 
-string OrbcommModem::getMessageContentToMobile(void)
+vector<uint8_t> OrbcommModem::getMessageContentToMobile(void)
 {
-  return removeCharsAndSlashes(message_content_ToMobile);
+  string msg_content_ToMobile = removeCharsAndSlashes(message_content_ToMobile);
+  return hexStringToBytes(msg_content_ToMobile);
 }
 
 void OrbcommModem::serialInitialize(uint32_t baud_rate, uint32_t serial_register, uint8_t rx_pin, uint8_t tx_pin)
@@ -67,113 +68,76 @@ void OrbcommModem::serialInitialize(uint32_t baud_rate, uint32_t serial_register
   powerMode = mobile_powered;
   // sleepSchedule = sixty_minutes;
   sleepSchedule = five_seconds;
-}
-
-bool OrbcommModem::checkSerialConnection(void)
-{
-  bool status_connection;
-  if (PortSerial.available())
-    status_connection = true;
-  else
-    status_connection = false;
-  return status_connection;
-}
-
-string OrbcommModem::executeAtCommand(string command, string result_expected, string error_expected, int command_timeout = 5000)
-{
-  PortSerial.println(command.c_str());
-  string result = "";
-
-  while (checkSerialConnection())
-    PortSerial.readString();
-
-  unsigned long last_serial_read_instant = millis();
-  while (millis() - last_serial_read_instant < command_timeout)
-  {
-    if (checkSerialConnection())
-    {
-      result = PortSerial.readString().c_str(); // #FIXME testar de forma cumulativa serializada
-      PortSerial.println(result.c_str());
-      last_serial_read_instant = millis();
-      if (result.find(error_expected) != string::npos)
-        return result;
-      else if (result.find(result_expected) != string::npos)
-        return result;
-    }
-  }
-  return result;
+  shippingTimePeriod = shipping_period_sixty_minutes;
 }
 
 bool OrbcommModem::disableSim7000Serial(uint8_t pin_number, uint8_t mode_operation_pin, uint8_t pin_state)
 {
   bool result = false;
-  uint32_t time = 0;
+  uint32_t time_ms = 0;
 
   if (result == false)
   {
     /** Define o numero do pino e seu modo de operação */
     pinMode(pin_number, mode_operation_pin);
-    PortSerial.println("Iniciando rorina de desabilitação da serial da SIM7000...");
+    Serial.println("Iniciando rorina de desabilitacao da serial da SIM7000...");
 
-    PortSerial.println("DESLIGANDO LED.");
-    executeAtCommand("AT+CNETLIGHT=0", ORBCOMM_OK, ORBCOMM_ERROR, TIMEOUT_COMMAND);
-
-    PortSerial.printf("Pino power: %d\n", pin_number);
+    Serial.printf("Pino power: %d\n", pin_number);
 
     if (mode_operation_pin == OUTPUT)
     {
-      PortSerial.println("Modo de operação output.");
+      Serial.println("Modo de operacao output.");
     }
     else
     {
-      PortSerial.println("Modo de operação input.");
+      Serial.println("Modo de operacao input.");
     }
 
     /** 1º Passo - pino fica em nivel logico baixo por 1.2 segundos e volta para nivel logico alto */
-    PortSerial.println("1º Passo - pino fica em nivel logico baixo por 1.2 segundos e volta para nivel logico alto");
+    Serial.println("1º Passo - pino fica em nivel logico baixo por 1.2 segundos e volta para nivel logico alto");
     pinMode(pin_number, OUTPUT);
     digitalWrite(pin_number, LOW);
-    PortSerial.printf("Pino state BOOL: %s\n", PIN_STATE_PRINTF(digitalRead(pin_number)));
-    PortSerial.printf("Pino state INTEGER: %d\n", digitalRead(pin_number));
+    Serial.printf("Pino state BOOL: %s\n", PIN_STATE_PRINTF(digitalRead(pin_number)));
+    Serial.printf("Pino state INTEGER: %d\n", digitalRead(pin_number));
 
-    time = 1200;
-    delay(1200);
-    PortSerial.printf("Duracao: %d\n", time);
+    time_ms = 1200;
+    delay(time_ms);
+    Serial.printf("Duracao: %d\n", time_ms);
 
     digitalWrite(pin_number, HIGH);
-    PortSerial.printf("Pino state BOOL: %s\n", PIN_STATE_PRINTF(digitalRead(pin_number)));
-    PortSerial.printf("Pino state INTEGER: %d\n", digitalRead(pin_number));
+    Serial.printf("Pino state BOOL: %s\n", PIN_STATE_PRINTF(digitalRead(pin_number)));
+    Serial.printf("Pino state INTEGER: %d\n", digitalRead(pin_number));
 
-    time = 5000;
-    delay(5000);
-    PortSerial.printf("Duracao: %d\n", time);
+    time_ms = 5000;
+    delay(time_ms);
+    Serial.printf("Duracao: %d\n", time_ms);
 
     /** 2º Passo - pino fica em nivel logico baixo por 1.4 segundos e volta para nivel logico alto */
-    PortSerial.println("2º Passo - pino fica em nivel logico baixo por 1.4 segundos e volta para nivel logico alto");
+    Serial.println("2º Passo - pino fica em nivel logico baixo por 1.4 segundos e volta para nivel logico alto");
     pinMode(pin_number, OUTPUT);
     digitalWrite(pin_number, LOW);
-    PortSerial.printf("Pino state BOOL: %s\n", PIN_STATE_PRINTF(digitalRead(pin_number)));
-    PortSerial.printf("Pino state INTEGER: %d\n", digitalRead(pin_number));
+    Serial.printf("Pino state BOOL: %s\n", PIN_STATE_PRINTF(digitalRead(pin_number)));
+    Serial.printf("Pino state INTEGER: %d\n", digitalRead(pin_number));
 
-    time = 1400;
-    delay(1400);
-    PortSerial.printf("Duracao: %d\n", time);
+    time_ms = 1400;
+    delay(time_ms);
+    Serial.printf("Duracao: %d\n", time_ms);
 
     digitalWrite(pin_number, HIGH);
-    PortSerial.printf("Pino state BOOL: %s\n", PIN_STATE_PRINTF(digitalRead(pin_number)));
-    PortSerial.printf("Pino state INTEGER: %d\n", digitalRead(pin_number));
+    Serial.printf("Pino state BOOL: %s\n", PIN_STATE_PRINTF(digitalRead(pin_number)));
+    Serial.printf("Pino state INTEGER: %d\n", digitalRead(pin_number));
 
     if (digitalRead(pin_number) == HIGH)
     {
-      PortSerial.printf("Pino state BOOL: %s\n", PIN_STATE_PRINTF(digitalRead(pin_number)));
-      PortSerial.printf("Pino state INTEGER: %d\n", digitalRead(pin_number));
-      PortSerial.println("FIM rorina de desabilitação da serial da SIM7000...");
+      Serial.printf("Pino state BOOL: %s\n", PIN_STATE_PRINTF(digitalRead(pin_number)));
+      Serial.printf("Pino state INTEGER: %d\n", digitalRead(pin_number));
+      Serial.println("FIM rorina de desabilitação da serial da SIM7000...");
       result = true;
     }
     else
     {
-      PortSerial.printf("Pino state BOOL: %s\n", PIN_STATE_PRINTF(digitalRead(pin_number)));
-      PortSerial.printf("Pino state INTEGER: %d\n", digitalRead(pin_number));
+      Serial.printf("Pino state BOOL: %s\n", PIN_STATE_PRINTF(digitalRead(pin_number)));
+      Serial.printf("Pino state INTEGER: %d\n", digitalRead(pin_number));
       result = false;
     }
   }
@@ -185,17 +149,17 @@ bool OrbcommModem::setPowerMode(string enum_mode)
   string result = executeAtCommand("ATS50=" + enum_mode, ORBCOMM_OK, ORBCOMM_ERROR, TIMEOUT_COMMAND);
   if (result.find("OK") != string::npos)
   {
-    PortSerial.println("Configurado set power mode com sucesso!");
+    Serial.println("Configurado set power mode com sucesso!");
     return true;
   }
   else if (result.find("ERROR") != string::npos)
   {
-    PortSerial.println("Error em configurado set power mode");
+    Serial.println("Error em configurado set power mode");
     return false;
   }
   else
   {
-    PortSerial.println("[setPowerMode] - Problema na comunicacao!");
+    Serial.println("[setPowerMode] - Problema na comunicacao!");
     return false;
   }
 }
@@ -205,18 +169,67 @@ bool OrbcommModem::setSleepSchedule(string enum_tempo)
   string result = executeAtCommand("ATS51=" + enum_tempo, ORBCOMM_OK, ORBCOMM_ERROR, TIMEOUT_COMMAND);
   if (result.find("OK") != string::npos)
   {
-    PortSerial.println("Configurado set sleep schedule com sucesso!");
+    Serial.println("Configurado set sleep schedule com sucesso!");
     return true;
   }
   else if (result.find("ERROR") != string::npos)
   {
-    PortSerial.println("Error em configurado set sleep schedule");
+    Serial.println("Error em configurado set sleep schedule");
     return false;
   }
   else
   {
-    PortSerial.println("[setSleepSchedule] - Problema na comunicacao!");
+    Serial.println("[setSleepSchedule] - Problema na comunicacao!");
     return false;
+  }
+}
+
+uint8_t OrbcommModem::getPeriodSize(vector<uint8_t> message_content_to_mobile)
+{
+
+  if (message_content_to_mobile.size() >= 3)
+  {
+    uint8_t byte1 = message_content_to_mobile[1];
+    uint8_t byte2 = message_content_to_mobile[2];
+
+    Serial.print("byte1: ");
+    Serial.println(byte1, HEX); // Imprime byte1 em formato hexadecimal
+    Serial.print("byte2: ");
+    Serial.println(byte2, HEX); // Imprime byte2 em formato hexadecimal
+    if (byte1 == PERIOD_CHANGE_MESSAGE_TYPE)
+    {
+      Serial.println("Tipo mensagem PERIODSIZE!");
+      if (byte2 == SHIPPING_PERIOD_FIFTEEN_MINUTES)
+      {
+        Serial.println("Tempo de envio de mensagens From-Mobile sera de 15 minutios");
+        shippingTimePeriod = shipping_period_fifteen_minutes;
+        return shippingTimePeriod;
+      }
+      else if (byte2 == SHIPPING_PERIOD_SIXTY_MINUTES)
+      {
+        Serial.println("Tempo de envio de mensagens From-Mobile sera de 60 minutios");
+        shippingTimePeriod = shipping_period_sixty_minutes;
+        return shippingTimePeriod;
+      }
+      else
+      {
+        Serial.println("Tempo de envio de mensagens From-Mobile (RESERVADO) Ainda não implementado!");
+        shippingTimePeriod = shipping_period_zero_minutes;
+        return shippingTimePeriod;
+      }
+    }
+    else
+    {
+      Serial.println("Tipo mensagem RESERVADO!");
+      shippingTimePeriod = shipping_period_zero_minutes;
+      return shippingTimePeriod;
+    }
+  }
+  else
+  {
+    Serial.println("Não há dados suficientes no vetor.");
+    shippingTimePeriod = shipping_period_zero_minutes;
+    return shippingTimePeriod;
   }
 }
 
@@ -258,40 +271,22 @@ bool OrbcommModem::orbcommInitialize(void)
     }
     else if ((power_mode_status) && (sleep_schedule_status) && (timestamp_status) && (gps_status))
     {
-      PortSerial.println("Inicializacao do servicos ORBCOMM executada com sucesso!!!");
+      Serial.println("Inicializacao do servicos ORBCOMM executada com sucesso!!!");
       return true;
     }
     else
     {
-      PortSerial.println("ERRRO na inicializacao do servicos ORBCOMM!!!");
+      Serial.println("ERRRO na inicializacao do servicos ORBCOMM!!!");
       return false;
     }
   }
 }
 
-bool OrbcommModem::orbcommRoutine(string index_message, const uint8_t *raw_payload, size_t raw_payload_length)
+bool OrbcommModem::orbcommRoutineSendMessage(string index_message, const uint8_t *raw_payload, size_t raw_payload_length)
 {
-  PortSerial.println("*********************");
-  PortSerial.println(" INICIO DA ROTINA!!! ");
-  PortSerial.println("*********************");
-
-  /**************************************************************************************/
-  /**************************************************************************************/
-  /**************************************************************************************/
-
-  uint64_t last_count_time = millis();
-  while ((millis() - last_count_time) < TIMEOUT_MENSSAGE_STATE)
-  {
-    bool receiving_state = receivingRoutineMessageToMobile();
-    if (receiving_state == true)
-    {
-      break;
-    }
-  }
-
-  /**************************************************************************************/
-  /**************************************************************************************/
-  /**************************************************************************************/
+  Serial.println("*********************");
+  Serial.println(" INICIO DA ROTINA!!! ");
+  Serial.println("*********************");
 
   string raw_payload_encoded_data = encodeBinaryPacket(raw_payload, raw_payload_length);
   bool rotine_state = routineSendingMessageFromMobile(index_message, raw_payload_encoded_data);
@@ -307,21 +302,38 @@ bool OrbcommModem::orbcommRoutine(string index_message, const uint8_t *raw_paylo
         message_state = isSuccessfulMessageState();
         if (message_state == true)
         {
-          PortSerial.println("*********************");
-          PortSerial.println("  FIM DA ROTINA!!!  ");
-          PortSerial.println("*********************");
+          Serial.println("*********************");
+          Serial.println("  FIM DA ROTINA!!!  ");
+          Serial.println("*********************");
           return true;
         }
       }
-      PortSerial.printf("Tempo em segundos tentado verificar o state da mensagem da fila From-Mobile: %d\n", (millis() - last_count_time) / 1000);
-      PortSerial.println("Timout na execucao da rotina de verificar o state da mensagem da fila From-Mobile!");
-      PortSerial.println("Error na rotina de verificar o state da mensagem da fila From-Mobile!");
+      Serial.printf("Tempo em segundos tentado verificar o state da mensagem da fila From-Mobile: %d\n", (millis() - last_count_time) / 1000);
+      Serial.println("Timout na execucao da rotina de verificar o state da mensagem da fila From-Mobile!");
+      Serial.println("Error na rotina de verificar o state da mensagem da fila From-Mobile!");
+      return false;
     }
-    return true;
   }
   else
   {
     return false;
+  }
+}
+
+bool OrbcommModem::orbcommRoutineMessageReceiving(void)
+{
+  uint64_t last_count_time = millis();
+  while ((millis() - last_count_time) < TIMEOUT_MENSSAGE_STATE)
+  {
+    bool receiving_state = receivingRoutineMessageToMobile();
+    if (receiving_state == true)
+    {
+      return true;
+    }
+    else
+    {
+      return false;
+    }
   }
 }
 
@@ -330,17 +342,17 @@ bool OrbcommModem::deleteQueueMessageFromMobile(string index_message)
   string result = executeAtCommand("AT%MGRC=\"ZeusMsg" + index_message + "\"", ORBCOMM_OK, ORBCOMM_ERROR, TIMEOUT_COMMAND);
   if (result.find("OK") != string::npos)
   {
-    PortSerial.println("Deletado mensagem com sucesso!");
+    Serial.println("Deletado mensagem com sucesso!");
     return true;
   }
   else if (result.find("ERROR") != string::npos)
   {
-    PortSerial.println("Error em deletar mensagem!");
+    Serial.println("Error em deletar mensagem!");
     return false;
   }
   else
   {
-    PortSerial.println("[deleteQueueMessageFromMobile] - Problema na comunicacao!");
+    Serial.println("[deleteQueueMessageFromMobile] - Problema na comunicacao!");
     return false;
   }
 }
@@ -371,14 +383,14 @@ bool OrbcommModem::isSuccessfulMessageState(void)
 
     if (new_result[0] == '6')
     {
-      PortSerial.print("Mensagem State: ");
-      PortSerial.println(new_result);
+      Serial.print("Mensagem State: ");
+      Serial.println(new_result);
       return true;
     }
     else
     {
-      PortSerial.print("Mensagem State: ");
-      PortSerial.println(new_result);
+      Serial.print("Mensagem State: ");
+      Serial.println(new_result);
       return false;
     }
   }
@@ -423,12 +435,12 @@ bool OrbcommModem::routineSendingMessageFromMobile(string index_message, string 
     bool send_message_queue_state = sendQueueForMessage(index_message, raw_payload_encoded_data, sin, min);
     if (send_message_queue_state == true)
     {
-      PortSerial.println("Fila vazia uma mensagem foi adicionada na fila From-Mobile com sucesso!");
+      Serial.println("Fila vazia uma mensagem foi adicionada na fila From-Mobile com sucesso!");
       return true;
     }
     else
     {
-      PortSerial.println("Fila vazia ERRO em adicionar uma mensagem na fila From-Mobile");
+      Serial.println("Fila vazia ERRO em adicionar uma mensagem na fila From-Mobile");
       return false;
     }
   }
@@ -438,12 +450,12 @@ bool OrbcommModem::routineSendingMessageFromMobile(string index_message, string 
     if (is_ready_to_send_message == true)
     {
       sendQueueForMessage(index_message, raw_payload_encoded_data, sin, min);
-      PortSerial.println("Adicionada de mensagem na fila From-Mobile apos a rotina de delecao de mensagem da fila From-Mobile!");
+      Serial.println("Adicionada de mensagem na fila From-Mobile apos a rotina de delecao de mensagem da fila From-Mobile!");
       return true;
     }
     else
     {
-      PortSerial.println("Error na rotina de envio de mensagem da fila From-Mobile!");
+      Serial.println("Error na rotina de envio de mensagem da fila From-Mobile!");
       return false;
     }
   }
@@ -452,11 +464,11 @@ bool OrbcommModem::routineSendingMessageFromMobile(string index_message, string 
 bool OrbcommModem::routineDeletingMessageFromMobile(string index_message)
 {
   bool status_delete_queue_message = deleteQueueMessageFromMobile(index_message);
-  PortSerial.println("Fila cheia executando rotina de delecao de mensagem fila From-Mobile...");
+  Serial.println("Fila cheia executando rotina de delecao de mensagem fila From-Mobile...");
 
   if (status_delete_queue_message == true)
   {
-    PortSerial.println("Fila vazia terminado rotina de delecao de mensagem da fila From-Mobile!");
+    Serial.println("Fila vazia terminado rotina de delecao de mensagem da fila From-Mobile!");
     return true;
   }
   else
@@ -466,10 +478,32 @@ bool OrbcommModem::routineDeletingMessageFromMobile(string index_message)
     {
       status_delete_queue_message = deleteQueueMessageFromMobile(index_message);
     }
-    PortSerial.printf("Tempo em segundos tentado deletar a mensagem da fila From-Mobile: %d\n", (millis() - last_count_time) / 1000);
-    PortSerial.println("Timout na execucao da rotina de delecao de mensagem da fila From-Mobile!");
-    PortSerial.println("Error na rotina de deleção de mensagem da fila From-Mobile!");
+    Serial.printf("Tempo em segundos tentado deletar a mensagem da fila From-Mobile: %d\n", (millis() - last_count_time) / 1000);
+    Serial.println("Timout na execucao da rotina de delecao de mensagem da fila From-Mobile!");
+    Serial.println("Error na rotina de deleção de mensagem da fila From-Mobile!");
 
+    return false;
+  }
+}
+
+bool OrbcommModem::checkQueueMessagesFromMobile(void)
+{
+  string result = executeAtCommand("AT%MGRS", ORBCOMM_OK, ORBCOMM_ERROR, TIMEOUT_COMMAND);
+  char *c_result;
+  c_result = &result[0];
+  if ((result.find("%MGRS:") != string::npos) && (result.find("OK") != string::npos) && (result.length() == 26))
+  {
+    Serial.println("Fila Vazia!");
+    return true;
+  }
+  else if ((result.find("%MGRS:") != string::npos) && (result.find("OK") != string::npos) && (result.length() > 26))
+  {
+    Serial.println("Fila Cheia!");
+    return false;
+  }
+  else if (result.find("ERROR") != string::npos)
+  {
+    Serial.println("Error no comando!");
     return false;
   }
 }
@@ -485,77 +519,59 @@ bool OrbcommModem::receivingRoutineMessageToMobile(void)
   }
 }
 
-bool OrbcommModem::checkQueueMessagesFromMobile(void)
-{
-  string result = executeAtCommand("AT%MGRS", ORBCOMM_OK, ORBCOMM_ERROR, TIMEOUT_COMMAND);
-  char *c_result;
-  c_result = &result[0];
-  if ((result.find("%MGRS:") != string::npos) && (result.find("OK") != string::npos) && (result.length() == 17))
-  {
-    PortSerial.println("Fila Vazia!");
-    return true;
-  }
-  else if ((result.find("%MGRS:") != string::npos) && (result.find("OK") != string::npos) && (result.length() > 17))
-  {
-    PortSerial.println("Fila Cheia!");
-    return false;
-  }
-  else if (result.find("ERROR") != string::npos)
-  {
-    PortSerial.println("Error no comando!");
-    return false;
-  }
-}
-
 bool OrbcommModem::getGPS(void)
 {
   string result = executeAtCommand("AT%GPS=15,1,\"RMC\"", ORBCOMM_OK, ORBCOMM_ERROR, TIMEOUT_COMMAND);
-  char *c_result = &result[0];
-  if ((result.find("%GPS:") != string::npos) && (result.find("OK") != string::npos) && (result.length() > 26))
+
+  // Procurar o início da string RMC
+  size_t rmcPos = result.find("$GPRMC");
+  if (rmcPos != string::npos)
   {
-    char *new_result;
-    new_result = strtok(c_result, ",");
-    new_result = strtok(NULL, ",");
-    new_result = strtok(NULL, ",");
-    new_result = strtok(NULL, ",");
+    // Encontramos o início do campo RMC, avançamos para a posição correta
+    rmcPos += 7; // Tamanho de "$GPRMC,"
 
-    float latitude_local = atof(new_result);
-    new_result = strtok(NULL, ",");
-    if (new_result[0] == 'S') // Direção da Latitude (N ou S)
+    // Extrair os campos relevantes com sscanf
+    int hour, minute, second;
+    char latitude_dir, longitude_dir;
+    float latitude_local, longitude_local, speed, course;
+
+    if (sscanf(result.c_str() + rmcPos, "%02d%02d%02d.%*d,%*c,%f,%c,%f,%c,%f,%f,%*[^*]", &hour, &minute, &second, &latitude_local, &latitude_dir, &longitude_local, &longitude_dir, &speed, &course) == 9)
     {
-      latitude_local = -latitude_local;
+      // Converter para decimal corretamente
+      int degrees_latitude = int(latitude_local / 100);
+      float minutes_latitude = fmod(latitude_local, 100);
+      float latitude_decimal = degrees_latitude + (minutes_latitude / 60);
+
+      if (latitude_dir == 'S')
+      {
+        latitude_decimal = -latitude_decimal;
+      }
+
+      int degrees_longitude = int(longitude_local / 100);
+      float minutes_longitude = fmod(longitude_local, 100);
+      float longitude_decimal = degrees_longitude + (minutes_longitude / 60);
+
+      if (longitude_dir == 'W')
+      {
+        longitude_decimal = -longitude_decimal;
+      }
+
+      // Atualizar os valores de latitude e longitude
+      latitude = latitude_decimal;
+      longitude = longitude_decimal;
+
+      // Debugging
+      Serial.print("LATITUDE: ");
+      Serial.println(latitude, 7); // Use 7 casas decimais para maior precisão.
+      Serial.print("LONGITUDE: ");
+      Serial.println(longitude, 7); // Use 7 casas decimais para maior precisão.
+
+      return true;
     }
-    new_result = strtok(NULL, ",");
-    float longitude_local = atof(new_result);
-    new_result = strtok(NULL, ",");
-    if (new_result[0] == 'W') // Direção da Longitude (E ou W)
-    {
-      longitude_local = -longitude_local;
-    }
-
-    // Converter para decimal corretamente
-    int degrees_latitude = int(latitude_local / 100.0);
-    float minutes_latitude = latitude_local - degrees_latitude * 100.0;
-    float latitude_decimal = degrees_latitude + minutes_latitude / 60.0;
-    latitude = latitude_decimal;
-
-    int degrees_longitude = int(longitude_local / 100.0);
-    float minutes_longitude = longitude_local - degrees_longitude * 100.0;
-    float longitude_decimal = degrees_longitude + minutes_longitude / 60.0;
-    longitude = longitude_decimal;
-
-    PortSerial.print("LATITUDE: ");
-    PortSerial.println(latitude, 7); // Use 7 casas decimais para maior precisão
-    PortSerial.print("LONGITUDE: ");
-    PortSerial.println(longitude, 7); // Use 7 casas decimais para maior precisão
-
-    return true;
   }
-  else
-  {
-    return false;
-  }
+  return false;
 }
+
 
 bool OrbcommModem::getDateTime(void)
 {
@@ -572,11 +588,11 @@ bool OrbcommModem::getDateTime(void)
   string date = date_and_time.substr(0, 10); //(e.g., "2023-08-02")
   string time = date_and_time.substr(11, 8); //(e.g., "12:54:46")
 
-  PortSerial.print("Data: ");
-  PortSerial.println(date.c_str());
+  Serial.print("Data: ");
+  Serial.println(date.c_str());
 
-  PortSerial.print("Hora: ");
-  PortSerial.println(time.c_str());
+  Serial.print("Hora: ");
+  Serial.println(time.c_str());
 
   timestamp = unixTimestampConverter(date, time);
 
@@ -593,20 +609,20 @@ string OrbcommModem::getQueueOfMessagesToMobile(void)
     char *new_result;
     new_result = strtok(c_result, ":");
     new_result = strtok(NULL, ",");
-    PortSerial.println("*****************************************************");
-    PortSerial.print("Nome da mensagem da fila To-Mobile: ");
-    PortSerial.println(new_result);
-    PortSerial.println("*****************************************************");
+    Serial.println("*****************************************************");
+    Serial.print("Nome da mensagem da fila To-Mobile: ");
+    Serial.println(new_result);
+    Serial.println("*****************************************************");
     return new_result;
   }
   else if ((result.find("%MGFN") != string::npos) && (result.find("OK") != string::npos) && (result.length() <= 17))
   {
-    PortSerial.println("[getQueueOfMessagesToMobile] - Não existe mensagem na fila To-Mobile");
+    Serial.println("[getQueueOfMessagesToMobile] - Não existe mensagem na fila To-Mobile");
     return result;
   }
   else
   {
-    PortSerial.println("[getQueueOfMessagesToMobile] - Erro na execução do comando AT%MGFN");
+    Serial.println("[getQueueOfMessagesToMobile] - Erro na execução do comando AT%MGFN");
     return result;
   }
 }
@@ -627,21 +643,21 @@ bool OrbcommModem::getContentOfSpecificMessagesOfQueueToMobile(string message_na
     new_result = strtok(NULL, ",");
     new_result = strtok(NULL, ",");
     new_result = strtok(NULL, ",");
-    PortSerial.println("*****************************************************");
-    PortSerial.print("Conteudo da mensagem da fila To-Mobile: ");
-    PortSerial.println(new_result);
+    Serial.println("*****************************************************");
+    Serial.print("Conteudo da mensagem da fila To-Mobile: ");
+    Serial.println(new_result);
     message_content_ToMobile = new_result;
-    PortSerial.println("*****************************************************");
+    Serial.println("*****************************************************");
     return true;
   }
   else if ((result.find("%MGFG") != string::npos) && (result.find("OK") != string::npos) && (result.length() <= 9))
   {
-    PortSerial.println("[getContentOfSpecificMessagesOfQueueToMobile] - Não existe mensagem na fila To-Mobile");
+    Serial.println("[getContentOfSpecificMessagesOfQueueToMobile] - Não existe mensagem na fila To-Mobile");
     return false;
   }
   else
   {
-    PortSerial.println("[getContentOfSpecificMessagesOfQueueToMobile] - Erro na execução do comando AT%MGFG=NomeMensagem");
+    Serial.println("[getContentOfSpecificMessagesOfQueueToMobile] - Erro na execução do comando AT%MGFG=NomeMensagem");
     return false;
   }
 }
@@ -661,7 +677,7 @@ string OrbcommModem::getStatusAntennaJamming(void)
 string OrbcommModem::encodeBinaryPacket(const uint8_t *raw_payload, size_t raw_payload_length)
 {
   string encode_data = decimalArrayToHexadecimalString(raw_payload, raw_payload_length);
-  // PortSerial.printf("MSG: %s\n", encode_data.c_str());
+  // Serial.printf("MSG: %s\n", encode_data.c_str());
 
   return encode_data;
 }
@@ -698,8 +714,8 @@ double OrbcommModem::unixTimestampConverter(string date, string time)
   tm.tm_sec = seconds;
   double total_seconds = mktime(&tm);
 
-  PortSerial.print("TimeStamp:");
-  PortSerial.println(total_seconds);
+  Serial.print("TimeStamp:");
+  Serial.println(total_seconds);
 
   return total_seconds;
 }
@@ -729,4 +745,56 @@ string OrbcommModem::removeCharsAndSlashes(const string &input)
     }
   }
   return output;
+}
+
+vector<uint8_t> OrbcommModem::hexStringToBytes(const string &hexString)
+{
+  vector<uint8_t> bytes;
+
+  for (size_t i = 0; i < hexString.length(); i += 2)
+  {
+    string byteString = hexString.substr(i, 2);
+    uint8_t byte = strtol(byteString.c_str(), NULL, 16);
+    bytes.push_back(byte);
+  }
+
+  return bytes;
+}
+
+string OrbcommModem::executeAtCommand(string command, string result_expected, string error_expected, int command_timeout = 5000)
+{
+
+  Serial.print("Comando a executar: ");
+  Serial.println(command.c_str());
+  PortSerial.println(command.c_str());
+  string result = "";
+
+  while (checkSerialConnection())
+    PortSerial.readString();
+
+  unsigned long last_serial_read_instant = millis();
+  while (millis() - last_serial_read_instant < command_timeout)
+  {
+    if (checkSerialConnection())
+    {
+      result = PortSerial.readString().c_str(); // #FIXME testar de forma cumulativa serializada
+      Serial.println(result.c_str());
+      last_serial_read_instant = millis();
+      if (result.find(error_expected) != string::npos)
+        return result;
+      else if (result.find(result_expected) != string::npos)
+        return result;
+    }
+  }
+  return result;
+}
+
+bool OrbcommModem::checkSerialConnection(void)
+{
+  bool status_connection;
+  if (PortSerial.available())
+    status_connection = true;
+  else
+    status_connection = false;
+  return status_connection;
 }

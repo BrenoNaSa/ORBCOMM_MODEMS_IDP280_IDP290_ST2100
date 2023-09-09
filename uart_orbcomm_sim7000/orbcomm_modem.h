@@ -7,17 +7,21 @@
  */
 #pragma once
 
+#include <ctime>
+#include <vector>
 #include <string>
-#include <string.h>
+#include <sstream>
 #include <stdint.h>
+#include <string.h>
 #include "arduino.h"
-
-#include <ctime>   // Include the ctime header for struct tm and mktime
-#include <sstream> // Include the sstream header for std::stringstream
 
 #define TIMEOUT_DELETION_MSG 30000
 #define TIMEOUT_MENSSAGE_STATE 60000
 #define TIMEOUT_ROUTINE_INITIALIZE 60000
+
+#define PERIOD_CHANGE_MESSAGE_TYPE 1
+#define SHIPPING_PERIOD_FIFTEEN_MINUTES 1
+#define SHIPPING_PERIOD_SIXTY_MINUTES 2
 
 #define PWRKEY 4
 
@@ -28,7 +32,7 @@
 #define ORBCOMM_OK "OK"
 #define TIMEOUT_COMMAND 5000
 
-#define PortSerial (Serial)
+#define PortSerial (Serial1)
 #define BAUDRATE (9600)
 #define PIN_SERIAL_RX (26)
 #define PIN_SERIAL_TX (27)
@@ -62,6 +66,13 @@ enum SleepSchedule
   twenty_minutes = 10,
 };
 
+enum ShippingTimePeriod
+{
+  shipping_period_zero_minutes = 0,
+  shipping_period_fifteen_minutes = 15,
+  shipping_period_sixty_minutes = 60,
+};
+
 class OrbcommModem
 {
 public:
@@ -70,6 +81,7 @@ public:
   char buffer[2];
   PowerMode powerMode;
   SleepSchedule sleepSchedule;
+  ShippingTimePeriod shippingTimePeriod;
 
   void setSIN(uint8_t value);                                                                                  // Esse metodo faz SET no valor do parâmetro SIM
   void setMIN(uint8_t value);                                                                                  // Esse metodo faz SET no valor do parâmetro MIN
@@ -78,15 +90,15 @@ public:
   float getLatitude(void);                                                                                     // Esse metodo faz GET no valor do parâmetro Latitude
   float getLongitude(void);                                                                                    // Esse metodo faz GET no valor do parâmetro Longitude
   double getTimeStamp(void);                                                                                   // Esse metodo faz GET no valor do parâmetro TimeStamp
-  string getMessageContentToMobile(void);                                                                      // Esse metodo faz GET no valor do parâmetro Conteudo da mensagem To-Mobile
+  vector<uint8_t> getMessageContentToMobile(void);                                                             // Esse metodo faz GET no valor do parâmetro Conteudo da mensagem To-Mobile
   void serialInitialize(uint32_t baud_rate, uint32_t serial_register, uint8_t rx_pin, uint8_t tx_pin);         // Essa função inicializa a serial utilizada pela modem da ORBCOMM
-  bool checkSerialConnection(void);                                                                            // Essa função verifica o status da comunicação serial
-  string executeAtCommand(string command, string result_expected, string error_expected, int command_timeout); // Essa função executa qualquer dos comanados ATs da ORBCOMM
   bool disableSim7000Serial(uint8_t pin_number, uint8_t mode_operation_pin, uint8_t pin_state);                // Essa função tem como objetivo exclusivo desabilitar uso da serial pela SIM7000.
   bool setPowerMode(string enum_mode);                                                                         // Essa função executa o comando que definir modo de energia.
   bool setSleepSchedule(string enum_tempo);                                                                    // Essa função executa o comando que definir periodo de ativacao para um modem de modo de baixo consumo de energia.
+  uint8_t getPeriodSize(vector<uint8_t> message_content_to_mobile);                                            // Essa função tem como finalidade retornar o valor do PERIOD_SIZE
   bool orbcommInitialize(void);                                                                                // Essa função serve para inicializar o serviços ORBCOMM
-  bool orbcommRoutine(string index_message, const uint8_t *raw_payload, size_t raw_payload_length);            // Essa função executa a rotinas dos serviços ORBCOMM
+  bool orbcommRoutineSendMessage(string index_message, const uint8_t *raw_payload, size_t raw_payload_length); // Essa função executa a rotinas dos serviços ORBCOMM
+  bool orbcommRoutineMessageReceiving(void);                                                                   // Essa função executa a rotinas dos serviços ORBCOMM
 
 private:
   uint8_t SIN;
@@ -103,8 +115,8 @@ private:
   bool sendQueueForMessage(string index_message, string raw_payload, string sin, string min);    // Essa função executa o comando que enviar uma mensagem para fila mensagem From-Mobile.
   bool routineSendingMessageFromMobile(string index_message, string raw_payload_encoded_data);   // Essa função executa o a rotina de envio de uma mensagem para fila mensagem From-Mobile.
   bool routineDeletingMessageFromMobile(string index_message);                                   // Essa função executa uma rotina para deletar uma mensagem da fila From-Mobile.
-  bool receivingRoutineMessageToMobile(void);                                                    // Essa função executa uma rotina para receber uma mensagem da fila To-Mobile.
   bool checkQueueMessagesFromMobile(void);                                                       // Essa função verifica a fila de mensagens From-Mobile.
+  bool receivingRoutineMessageToMobile(void);                                                    // Essa função executa uma rotina para receber uma mensagem da fila To-Mobile.
   bool getGPS(void);                                                                             // Essa função executa o comando que retorna GPS.
   bool getDateTime(void);                                                                        // Essa função devera retorna o valor do timestamp ao inves da data e hora UTC.
   bool getContentOfSpecificMessagesOfQueueToMobile(string message_name);                         // Essa função executa o comando e retorna o centeudo da mensagem em string.
@@ -116,4 +128,7 @@ private:
   double unixTimestampConverter(string date, string time);                                       // Essa função retorna o timestamp em Unix-Timestamp
   uint16_t getUint16TimeFragment(string date_and_time, uint8_t substr_pos, uint8_t substr_size); // Essa função retorna os fragmento do timestamp em uint16_t
   string removeCharsAndSlashes(const string &input);                                             // Essa função remove alguns caracteres e os separadores de hexadecimais da string de entrada e retorna outra string.
+  vector<uint8_t> hexStringToBytes(const string &hexString);
+  string executeAtCommand(string command, string result_expected, string error_expected, int command_timeout); // Essa função executa qualquer dos comanados ATs da ORBCOMM
+  bool checkSerialConnection(void);                                                                            // Essa função verifica o status da comunicação serial
 };
